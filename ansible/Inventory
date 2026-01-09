@@ -1,0 +1,9 @@
+[appserver]
+103.103.23.208
+
+[gateway]
+103.31.205.58
+
+[all:vars]
+ansible_user=fauzan
+ansible_python_interpreter=/usr/bin/python3

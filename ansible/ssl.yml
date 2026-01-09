@@ -1,0 +1,39 @@
+---
+- name: Setup SSL with certbot
+  hosts: gateway
+  become: yes
+
+  vars:
+    domain_names:
+       - fauzan.studentdumbways.my.id
+       - node-fauzan.studentdumbways.my.id
+       - grafana-fauzan.studentdumbways.my.id
+       - prometheus-fauzan.studentdumbways.my.id
+    email_admin: fauznpm@gmail.com
+
+  tasks:
+    - name: Install certbot and nginx plugin
+      apt:
+        update_cache: yes
+        name:
+          - certbot
+          - python3-certbot-nginx
+        state: present
+
+    - name: Obtain SSL certificate
+      command: >
+        certbot --nginx
+        {% for domain in domain_names %}
+        -d {{ domain }}
+        {% endfor %}
+        --expand
+        --non-interactive
+        --agree-tos
+        -m {{ email_admin }}
+      notify: Reload nginx
+
+  handlers:
+    - name: Reload nginx
+      service:
+        name: nginx
+        state: reloaded

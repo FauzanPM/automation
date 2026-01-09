@@ -1,0 +1,105 @@
+---
+- name: Setup Gateway Server
+  hosts: gateway
+  become: yes
+
+  tasks:
+    - name: Install nginx
+      apt:
+        update_cache: yes
+        name: nginx
+        state: present
+
+
+    - name: Reverse proxy main app
+      copy:
+        dest: /etc/nginx/sites-enabled/app.conf
+        content: |
+          server {
+              listen 80;
+              server_name fauzan.studentdumbways.my.id;
+
+              location / {
+                  proxy_pass http://103.103.23.208:3000;
+              }
+          }
+        force: no
+      notify: Reload nginx
+
+    - name: Reverse proxy node exporter
+      copy:
+        dest: /etc/nginx/sites-enabled/node.conf
+        content: |
+          server {
+              listen 80;
+              server_name node-fauzan.studentdumbways.my.id;
+
+              location / {
+                  proxy_pass http://103.103.23.208:9100;
+              }
+          }
+        force: no
+      notify: Reload nginx
+
+    - name: Reverse proxy grafana
+      copy:
+        dest: /etc/nginx/sites-enabled/grafana.conf
+        content: |
+          server {
+              listen 80;
+              server_name grafana-fauzan.studentdumbways.my.id;
+
+              location / {
+                  proxy_pass http://103.103.23.208:3001;
+              }
+          }
+        force: no
+      notify: Reload nginx
+
+    - name: Reverse proxy prometheus
+      copy:
+        dest: /etc/nginx/sites-enabled/prometheus.conf
+        content: |
+          server {
+              listen 80;
+              server_name prometheus-fauzan.studentdumbways.my.id;
+
+              location / {
+                  proxy_pass http://103.103.23.208:9090;
+              }
+          }
+        force: no
+      notify: Reload nginx
+
+  handlers:
+    - name: Reload nginx
+      service:
+        name: nginx
+        state: reloaded
+
+- name: Setup App Server
+  hosts: appserver
+
+  tasks:
+    - name: Install dependencies
+      become: yes
+      apt:
+        update_cache: yes
+        name:
+          - curl
+          - git
+        state: present
+
+    - name: Install NVM
+      shell: |
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+      args:
+        creates: ~/.nvm/nvm.sh
+
+    - name: Install Node.js 22
+      shell: |
+        . "$HOME/.nvm/nvm.sh"
+        nvm install 22
+        nvm alias default 22
+      args:
+        executable: /bin/bash

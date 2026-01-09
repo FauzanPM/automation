@@ -1,0 +1,23 @@
+---
+- vars:
+    locale: ~/ansible
+    remote: /home/fauzan/monitoring
+  hosts: appserver, gateway
+  name: "Install node exporter"
+  tasks:
+    -
+      file:
+        path: ~/monitoring/
+        state: directory
+    -
+      copy:
+        dest: "{{remote}}/node-exporter.yml"
+        src: "{{locale}}/dockerstuff/node-exporter.yml"
+      name: "sending compose.yml"
+    -
+      community.docker.docker_compose_v2:
+        files:
+          - node-exporter.yml
+        project_name: monitoring
+        project_src: "{{remote}}"
+      name: "run docker compose"

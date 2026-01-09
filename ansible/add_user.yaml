@@ -1,0 +1,10 @@
+- name: add new user
+  hosts: all
+  become: true
+  tasks:
+    - name: create user
+      user:
+        name: devops
+        password: "$6$2bG.L8lxV3oZt.ez$OSAmNAKfQTFEFFRqjLd4moMqvFiG93mCsOS0B8WyI.d6ZLxcgcGDzNNuut1H3cxutdTwCUFPY0NT22a0xfb9i."
+        shell: /bin/bash
+        create_home: yes
