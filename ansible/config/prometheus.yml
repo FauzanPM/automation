@@ -3,9 +3,14 @@ scrape_configs:
   scrape_interval: 5s
   static_configs:
   - targets:
-    - "103.103.23.208:9100"
+    - "13.236.136.137:9100"
 - job_name: gateway
   scrape_interval: 5s
   static_configs:
   - targets:
     - "103.31.205.58:9100"
+- job_name: monitoring
+  scrape_interval: 5s
+  static_configs:
+  - targets:
+    - "3.107.29.73:9100"

@@ -8,3 +8,10 @@
         password: "$6$2bG.L8lxV3oZt.ez$OSAmNAKfQTFEFFRqjLd4moMqvFiG93mCsOS0B8WyI.d6ZLxcgcGDzNNuut1H3cxutdTwCUFPY0NT22a0xfb9i."
         shell: /bin/bash
         create_home: yes
+        groups: sudo
+        append: yes
+
+    - name: add ssh key to devops
+      authorized_key:
+        user: devops
+        key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/keybiz.pub') }}"

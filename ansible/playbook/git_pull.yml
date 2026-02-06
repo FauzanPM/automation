@@ -1,0 +1,55 @@
+---
+- name: Git Pull Repositories (Multiple Branches)
+  hosts: appserver
+  become: yes
+
+  vars:
+    app_dir: /opt/dumbways
+    branch: main
+
+  tasks:
+    - name: Ensure app directory exists and owned by ansible user
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+
+    - name: Pull backend ({{ branch }} branch)
+      git:
+        repo: git@github.com:FauzanPM/wayshub_be.git
+        dest: "{{ app_dir }}/backend"
+        version: "{{ branch }}"
+        update: yes
+        force: yes
+      become_user: "{{ ansible_user }}"
+
+    - name: Pull frontend ({{ branch }} branch)
+      git:
+        repo: git@github.com:FauzanPM/wayshub_fe.git
+        dest: "{{ app_dir }}/frontend"
+        version: "{{ branch }}"
+        update: yes
+        force: yes
+      become_user: "{{ ansible_user }}"
+
+    - name: Show current branch (backend)
+      command: git branch --show-current
+      args:
+        chdir: "{{ app_dir }}/backend"
+      register: backend_branch
+      become_user: "{{ ansible_user }}"
+
+    - name: Show current branch (frontend)
+      command: git branch --show-current
+      args:
+        chdir: "{{ app_dir }}/frontend"
+      register: frontend_branch
+      become_user: "{{ ansible_user }}"
+
+    - name: Display results
+      debug:
+        msg:
+          - "Backend on branch: {{ backend_branch.stdout }}"
+          - "Frontend on branch: {{ frontend_branch.stdout }}"

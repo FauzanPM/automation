@@ -1,0 +1,9 @@
+# Terraform
+aws/.terraform/
+aws/*.tfstate
+aws/*.tfstate.backup
+
+# Optional
+*.log
+
+dumbmerch/

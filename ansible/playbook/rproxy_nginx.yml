@@ -1,0 +1,187 @@
+---
+- name: Setup Gateway Server
+  hosts: appserver
+  become: yes
+
+  vars:
+    ip_app: 3.27.119.102
+    ip_mon: 15.134.31.72
+
+  tasks:
+    - name: Install nginx
+      apt:
+        update_cache: yes
+        name: nginx
+        state: present
+
+
+    - name: Reverse proxy main app (production)
+      copy:
+        dest: /etc/nginx/sites-enabled/app.conf
+        content: |
+          server {
+              listen 80;
+              server_name fauzan.studentdumbways.my.id;
+
+              location / {
+                  proxy_pass http://{{ip_app}}:3000;
+              }
+          }
+        force: no
+      notify: Reload nginx
+
+    - name: Reverse proxy main be (production)
+      copy:
+        dest: /etc/nginx/sites-enabled/be.conf
+        content: |
+          server {
+              listen 80;
+              server_name api.fauzan.studentdumbways.my.id;
+
+              location / {
+                  proxy_pass http://{{ip_app}}:5000;
+                  proxy_set_header Host $host;
+
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto https;
+              }
+          }
+        force: no
+      notify: Reload nginx
+
+    - name: Reverse proxy main app (staging)
+      copy:
+        dest: /etc/nginx/sites-enabled/app_stg.conf
+        content: |
+          server {
+              listen 80;
+              server_name staging.fauzan.studentdumbways.my.id;
+
+              location / {
+                  proxy_pass http://{{ip_app}}:3001;
+              }
+          }
+        force: no
+      notify: Reload nginx
+
+    - name: Reverse proxy main be (staging)
+      copy:
+        dest: /etc/nginx/sites-enabled/be_stg.conf
+        content: |
+          server {
+              listen 80;
+              server_name staging.api.fauzan.studentdumbways.my.id;
+
+              location / {
+                  proxy_pass http://{{ip_app}}:5001;
+                  proxy_set_header Host $host;
+
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto https;
+              }
+          }
+        force: no
+      notify: Reload nginx
+
+    - name: Reverse proxy Jenkins
+      copy:
+        dest: /etc/nginx/sites-enabled/Jenkins.conf
+        content: |
+          server {
+              listen 80;
+              server_name pipeline.fauzan.studentdumbways.my.id;
+
+              location / {
+                  proxy_pass http://{{ip_mon}}:8080;
+                  proxy_set_header Host $host;
+
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto https;
+              }
+          }
+        force: no
+      notify: Reload nginx
+
+    - name: Reverse proxy docker registry
+      copy:
+        dest: /etc/nginx/sites-enabled/registry.conf
+        content: |
+          server {
+              listen 80;
+              server_name registry.fauzan.studentdumbways.my.id;
+
+              location / {
+                  proxy_pass http://{{ip_mon}}:5000;
+                  proxy_set_header Host $host;
+
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto https;
+              }
+          }
+        force: no
+      notify: Reload nginx
+
+    - name: Reverse proxy node exporter
+      copy:
+        dest: /etc/nginx/sites-enabled/node.conf
+        content: |
+          server {
+              listen 80;
+              server_name node-fauzan.studentdumbways.my.id;
+
+              location / {
+                  proxy_pass http://{{ip_mon}}:9100;
+              }
+          }
+        force: no
+      notify: Reload nginx
+
+    - name: Reverse proxy grafana
+      copy:
+        dest: /etc/nginx/sites-enabled/grafana.conf
+        content: |
+          server {
+              listen 80;
+              server_name grafana-fauzan.studentdumbways.my.id;
+
+              location / {
+                  proxy_pass http://{{ip_mon}}:3001;
+                  proxy_set_header Host $host;
+
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto https;
+              }
+          }
+        force: no
+      notify: Reload nginx
+
+    - name: Reverse proxy prometheus
+      copy:
+        dest: /etc/nginx/sites-enabled/prometheus.conf
+        content: |
+          server {
+              listen 80;
+              server_name prometheus-fauzan.studentdumbways.my.id;
+
+              location / {
+                  proxy_pass http://{{ip_mon}}:9090;
+                  proxy_set_header Host $host;
+
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto https;
+              }
+          }
+        force: no
+      notify: Reload nginx
+
+  handlers:
+    - name: Reload nginx
+      service:
+        name: nginx
+        state: reloaded

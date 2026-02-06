@@ -1,0 +1,55 @@
+---
+- name: Push code to staging and production branches
+  hosts: appserver
+  become: yes
+  become_user: "{{ ansible_user }}"
+
+  vars:
+    app_dir: /opt/dumbmerch
+
+  tasks:
+  - name: Ensure backend is a git repository
+    stat:
+      path: "{{ app_dir }}/backend/.git"
+    register: backend_git
+
+  - name: Push backend to staging
+    shell: |
+      git checkout staging || git checkout -b staging
+      git add .
+      git commit -m "auto: update backend (staging)" || true
+      git push origin staging
+    args:
+      chdir: "{{ app_dir }}/backend"
+
+  - name: Push backend to production
+    shell: |
+      git checkout production || git checkout -b production
+      git add .
+      git commit -m "auto: update backend (production)" || true
+      git push origin production
+    args:
+      chdir: "{{ app_dir }}/backend"
+
+  - name: Ensure frontend is a git repository
+    stat:
+      path: "{{ app_dir }}/frontend/.git"
+    register: frontend_git
+
+  - name: Push frontend to staging
+    shell: |
+      git checkout staging || git checkout -b staging
+      git add .
+      git commit -m "auto: update frontend (staging)" || true
+      git push origin staging
+    args:
+      chdir: "{{ app_dir }}/frontend"
+
+  - name: Push frontend to production
+    shell: |
+      git checkout production || git checkout -b production
+      git add .
+      git commit -m "auto: update frontend (production)" || true
+      git push origin production
+    args:
+      chdir: "{{ app_dir }}/frontend"

@@ -1,14 +1,19 @@
 ---
 - name: Setup SSL with certbot
-  hosts: gateway
+  hosts: appserver
   become: yes
 
   vars:
     domain_names:
        - fauzan.studentdumbways.my.id
-       - node-fauzan.studentdumbways.my.id
-       - grafana-fauzan.studentdumbways.my.id
-       - prometheus-fauzan.studentdumbways.my.id
+       - api.fauzan.studentdumbways.my.id
+       - staging.fauzan.studentdumbways.my.id
+       - staging.api.fauzan.studentdumbways.my.id
+       - registry.fauzan.studentdumbways.my.id
+       - pipeline.fauzan.studentdumbways.my.id
+       - node.fauzan.studentdumbways.my.id
+       - grafana.fauzan.studentdumbways.my.id
+       - prometheus.fauzan.studentdumbways.my.id
     email_admin: fauznpm@gmail.com
 
   tasks:

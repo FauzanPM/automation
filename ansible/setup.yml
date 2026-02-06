@@ -50,7 +50,7 @@
               server_name grafana-fauzan.studentdumbways.my.id;
 
               location / {
-                  proxy_pass http://103.103.23.208:3001;
+                  proxy_pass http://16.176.161.101:3001;
               }
           }
         force: no
@@ -65,7 +65,7 @@
               server_name prometheus-fauzan.studentdumbways.my.id;
 
               location / {
-                  proxy_pass http://103.103.23.208:9090;
+                  proxy_pass http://16.176.161.101:9090;
               }
           }
         force: no
@@ -103,3 +103,23 @@
         nvm alias default 22
       args:
         executable: /bin/bash
+
+
+    - name: Download Go 1.25.5
+      become: yes
+      get_url:
+        url: https://go.dev/dl/go1.25.5.linux-amd64.tar.gz
+        dest: /tmp/go1.25.5.linux-amd64.tar.gz
+        mode: '0644'
+
+    - name: Install Go 1.25.5
+      become: yes
+      shell: |
+        rm -rf /usr/local/go
+        tar -C /usr/local -xzf /tmp/go1.25.5.linux-amd64.tar.gz
+
+    - name: Set Go PATH
+      become: yes
+      shell: |
+        echo 'export PATH=$PATH:/usr/local/go/bin' > /etc/profile.d/go.sh
+        chmod 644 /etc/profile.d/go.sh

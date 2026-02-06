@@ -1,0 +1,84 @@
+---
+- name: Setup App Server
+  hosts: appserver
+  become: yes
+
+  vars:
+    remote_user: devops
+
+  tasks:
+    - name: Install dependencies
+      apt:
+        update_cache: yes
+        name:
+          - curl
+          - git
+          - build-essential
+        state: present
+
+    - name: Install NVM
+      shell: |
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+      args:
+        executable: /bin/bash
+        creates: /home/{{ remote_user }}/.nvm/nvm.sh
+      become_user: "{{ remote_user }}"
+
+    - name: Install Node.js 22
+      shell: |
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm install 22
+        nvm alias default 22
+      args:
+        executable: /bin/bash
+      become_user: "{{ remote_user }}"
+
+    - name: Add NVM to .bashrc
+      lineinfile:
+        path: /home/{{ remote_user }}/.bashrc
+        line: "{{ item }}"
+        create: yes
+      loop:
+        - 'export NVM_DIR="$HOME/.nvm"'
+        - '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"'
+      become_user: "{{ remote_user }}"
+
+    - name: Download Go 1.23.5
+      get_url:
+        url: https://go.dev/dl/go1.23.5.linux-amd64.tar.gz
+        dest: /tmp/go1.23.5.linux-amd64.tar.gz
+        mode: '0644'
+
+    - name: Install Go 1.23.5
+      shell: |
+        rm -rf /usr/local/go
+        tar -C /usr/local -xzf /tmp/go1.23.5.linux-amd64.tar.gz
+
+    - name: Set Go PATH
+      copy:
+        content: 'export PATH=$PATH:/usr/local/go/bin'
+        dest: /etc/profile.d/go.sh
+        mode: '0644'
+
+    - name: Add Go to .bashrc
+      lineinfile:
+        path: /home/{{ remote_user }}/.bashrc
+        line: 'export PATH=$PATH:/usr/local/go/bin'
+        create: yes
+      become_user: "{{ remote_user }}"
+
+    - name: Verify installations
+      shell: |
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        echo "Node: $(node -v)"
+        echo "Go: $(/usr/local/go/bin/go version)"
+      args:
+        executable: /bin/bash
+      become_user: "{{ remote_user }}"
+      register: versions
+
+    - name: Show versions
+      debug:
+        msg: "{{ versions.stdout_lines }}"

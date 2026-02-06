@@ -1,0 +1,108 @@
+---
+- name: Deploy SonarQube with PostgreSQL using Docker
+  hosts: monitoring
+  become: true
+
+  vars:
+    base_dir: /home/devops/sonarqube
+    postgres:
+      user: sonar
+      password: sonarpass
+      db: sonarqube
+
+  tasks:
+    - name: Create SonarQube directories
+      file:
+        path: "{{ base_dir }}/{{ item }}"
+        state: directory
+        owner: devops
+        group: devops
+        mode: '0755'
+      loop:
+        - postgres
+        - data
+        - extensions
+        - logs
+
+    - name: Set proper permissions for SonarQube directories
+      file:
+        path: "{{ base_dir }}/{{ item }}"
+        state: directory
+        owner: '1000'
+        group: '1000'
+        mode: '0777'
+        recurse: yes
+      loop:
+        - data
+        - extensions
+        - logs
+
+    - name: Set vm.max_map_count for Elasticsearch
+      sysctl:
+        name: vm.max_map_count
+        value: '262144'
+        state: present
+        reload: yes
+
+    - name: Run PostgreSQL container
+      docker_container:
+        name: sonar-postgres
+        image: postgres:15-alpine
+        restart_policy: unless-stopped
+        env:
+          POSTGRES_USER: "{{ postgres.user }}"
+          POSTGRES_PASSWORD: "{{ postgres.password }}"
+          POSTGRES_DB: "{{ postgres.db }}"
+        volumes:
+          - "{{ base_dir }}/postgres:/var/lib/postgresql/data"
+        networks:
+          - name: sonarnet
+            aliases:
+              - postgres
+
+    - name: Wait for PostgreSQL to be ready
+      wait_for:
+        host: localhost
+        port: 5432
+        delay: 5
+        timeout: 30
+      ignore_errors: yes
+
+    - name: Stop existing SonarQube container if exists
+      docker_container:
+        name: sonarqube
+        state: absent
+      ignore_errors: yes
+
+    - name: Run SonarQube container
+      docker_container:
+        name: sonarqube
+        image: sonarqube:9.9-community
+        restart_policy: unless-stopped
+        ports:
+          - "9000:9000"
+        env:
+          SONAR_JDBC_URL: "jdbc:postgresql://sonar-postgres:5432/{{ postgres.db }}"
+          SONAR_JDBC_USERNAME: "{{ postgres.user }}"
+          SONAR_JDBC_PASSWORD: "{{ postgres.password }}"
+        volumes:
+          - "{{ base_dir }}/data:/opt/sonarqube/data"
+          - "{{ base_dir }}/extensions:/opt/sonarqube/extensions"
+          - "{{ base_dir }}/logs:/opt/sonarqube/logs"
+        networks:
+          - name: sonarnet
+        user: '1000:1000'
+
+    - name: Create Docker network for SonarQube
+      docker_network:
+        name: sonarnet
+        state: present
+
+    - name: Display SonarQube info
+      debug:
+        msg:
+          - "SonarQube is starting..."
+          - "Access at: http://{{ ansible_default_ipv4.address }}:9000"
+          - "Default credentials: admin / admin"
+          - "Wait ~2 minutes for first startup"
+          - "Check logs: docker logs -f sonarqube"

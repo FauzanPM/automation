@@ -1,0 +1,76 @@
+- name: Setup Docker Private Registry
+  hosts: appserver
+  become: true
+  vars:
+    registry_user: fauzan
+    registry_password: devops123
+    registry_domain: registry.fauzan.studentdumbways.my.id
+    registry_port: 6000
+
+    registry_base_dir: /opt/registry
+    registry_auth_dir: /opt/registry/auth
+    registry_data_dir: /opt/registry/data
+
+  tasks:
+  - name: Install apache2-utils (htpasswd)
+    apt:
+      name: apache2-utils
+      name: python3-passlib
+      state: present
+      update_cache: yes
+
+  - name: Create registry directories
+    file:
+      path: "{{ item }}"
+      state: directory
+      mode: 0755
+    loop:
+      - "{{ registry_auth_dir }}"
+      - "{{ registry_data_dir }}"
+
+  - name: Create htpasswd file
+    community.general.htpasswd:
+      path: "{{ registry_auth_dir }}/htpasswd"
+      name: "{{ registry_user }}"
+      password: "{{ registry_password }}"
+      crypt_scheme: bcrypt
+
+  - name: Pull registry image
+    docker_image:
+      name: registry
+      tag: "2"
+      source: pull
+
+  - name: Run private docker registry
+    docker_container:
+      name: private-registry
+      image: registry:2
+      state: started
+      restart_policy: always
+      published_ports:
+        - "{{ registry_port }}:5000"
+      volumes:
+        - "{{ registry_data_dir }}:/var/lib/registry"
+        - "{{ registry_auth_dir }}:/auth"
+      env:
+        REGISTRY_AUTH: htpasswd
+        REGISTRY_AUTH_HTPASSWD_REALM: "Registry Realm"
+        REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
+
+  - name: Wait for registry to be ready
+    wait_for:
+      host: 127.0.0.1
+      port: "{{ registry_port }}"
+      timeout: 30
+
+  - name: Test registry API (unauthorized expected)
+    uri:
+      url: "http://localhost:{{ registry_port }}/v2/"
+      method: GET
+      status_code: 401
+    register: registry_test
+
+  - name: Show registry test result
+    debug:
+      var: registry_test.status
+

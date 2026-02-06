@@ -1,9 +1,9 @@
 ---
-- hosts: appserver, gateway
+- hosts: monitoring
   name: "install server monitoring"
   vars:
-    locale: ~/ansible
-    remote: /home/fauzan/monitoring
+    locale: ~/automation/ansible
+    remote: /home/devops/monitoring
   tasks:
     - copy:
         dest: "{{remote}}/prometheus.yml"

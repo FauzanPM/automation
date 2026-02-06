@@ -1,0 +1,53 @@
+---
+- name: Generate Wildcard SSL Certificate
+  hosts: appserver
+  become: yes
+
+  vars:
+    domain: fauzan.studentdumbways.my.id
+    email: fauzanprimamukti@gmail.com
+
+  tasks:
+    - name: Install certbot
+      apt:
+        name: certbot
+        state: present
+        update_cache: yes
+
+    - name: Start certbot and capture TXT record
+      shell: |
+        certbot certonly --manual --preferred-challenges dns \
+          --email {{ email }} --agree-tos --no-eff-email \
+          --manual-public-ip-logging-ok \
+          -d {{ domain }} -d *.{{ domain }} \
+          --dry-run 2>&1 | grep -A1 "_acme-challenge"
+      register: txt_record
+      ignore_errors: yes
+
+    - name: Display TXT record to add
+      debug:
+        msg: "{{ txt_record.stdout_lines }}"
+
+    - name: Add this TXT record to Cloudflare
+      pause:
+        prompt: |
+
+          Add TXT record to Cloudflare (studentdumbways.my.id):
+
+          Type: TXT
+          Name: _acme-challenge.fauzan
+          Content: [see value above]
+
+          Then run manually on gateway server:
+          sudo certbot certonly --manual --preferred-challenges dns --email {{ email }} --agree-tos -d {{ domain }} -d *.{{ domain }}
+
+          Press ENTER when certificate is generated...
+
+    - name: Check certificate
+      stat:
+        path: /etc/letsencrypt/live/{{ domain }}/fullchain.pem
+      register: cert
+
+    - name: Result
+      debug:
+        msg: "Certificate: {{ 'Created ' if cert.stat.exists else 'Not Found ' }}"

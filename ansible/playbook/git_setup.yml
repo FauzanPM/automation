@@ -1,0 +1,96 @@
+- name: Git Configuration
+  hosts: appserver
+  become: yes
+
+  vars:
+    app_dir: /opt/dumbmerch
+    git_username: FauzanPM
+    git_email: fauzanprimamukti@gmail.com
+    fe_template_repo: https://github.com/demo-dumbways/fe-dumbmerch.git
+    be_template_repo: https://github.com/demo-dumbways/be-dumbmerch.git
+    fe_private_repo: git@github.com:FauzanPM/dumbmerch-fe.git
+    be_private_repo: git@github.com:FauzanPM/dumbmerch-be.git
+
+  tasks:
+  - name: Ensure .ssh directory exists
+    file:
+      path: /home/{{ ansible_user }}/.ssh
+      state: directory
+      owner: "{{ ansible_user }}"
+      group: "{{ ansible_user }}"
+      mode: '0700'
+
+  - name: Add github.com to known_hosts
+    known_hosts:
+      path: /home/{{ ansible_user }}/.ssh/known_hosts
+      name: github.com
+      key: "{{ lookup('pipe', 'ssh-keyscan github.com') }}"
+    become_user: "{{ ansible_user }}"
+
+  - name: Set git user name
+    git_config:
+      name: user.name
+      scope: global
+      value: "{{ git_username }}"
+    become_user: "{{ ansible_user }}"
+
+  - name: Set git user email
+    git_config:
+      name: user.email
+      scope: global
+      value: "{{ git_email }}"
+    become_user: "{{ ansible_user }}"
+
+  - name: Ensure app directory exists
+    file:
+      path: "{{ app_dir }}"
+      state: directory
+      owner: "{{ ansible_user }}"
+      group: "{{ ansible_user }}"
+      mode: '0755'
+
+  - name: Clone backend template
+    git:
+      repo: "{{ be_template_repo }}"
+      dest: "{{ app_dir }}/backend"
+      force: no
+    become_user: "{{ ansible_user }}"
+
+  - name: Set backend remote to private repo
+    command: git remote set-url origin {{ be_private_repo }}
+    args:
+      chdir: "{{ app_dir }}/backend"
+    become_user: "{{ ansible_user }}"
+
+  - name: Clone frontend template
+    git:
+      repo: "{{ fe_template_repo }}"
+      dest: "{{ app_dir }}/frontend"
+      force: no
+    become_user: "{{ ansible_user }}"
+
+  - name: Set frontend remote to private repo
+    command: git remote set-url origin {{ fe_private_repo }}
+    args:
+      chdir: "{{ app_dir }}/frontend"
+    become_user: "{{ ansible_user }}"
+
+  - name: Create and push branches (backend)
+    shell: |
+      git checkout -b staging || git checkout staging
+      git push -u origin staging || true
+      git checkout -b production || git checkout production
+      git push -u origin production || true
+    args:
+      chdir: "{{ app_dir }}/backend"
+    become_user: "{{ ansible_user }}"
+
+  - name: Create and push branches (frontend)
+    shell: |
+      git checkout -b staging || git checkout staging
+      git push -u origin staging || true
+      git checkout -b production || git checkout production
+      git push -u origin production || true
+    args:
+      chdir: "{{ app_dir }}/frontend"
+    become_user: "{{ ansible_user }}"

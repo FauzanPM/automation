@@ -1,0 +1,43 @@
+- name: Run Jenkins using Docker
+  hosts: monitoring
+  become: yes
+
+  vars:
+    jenkins_home: /opt/jenkins
+    jenkins_port: 8080
+
+  tasks:
+  - name: Create Jenkins home directory
+    file:
+      path: "{{ jenkins_home }}"
+      state: directory
+      owner: 1000
+      group: 1000
+      mode: '0755'
+
+  - name: Run Jenkins container
+    docker_container:
+      name: jenkins
+      image: jenkins/jenkins:lts-jdk21
+      state: started
+      restart_policy: unless-stopped
+      ports:
+        - "8080:8080"
+        - "50000:50000"
+      volumes:
+        - "{{ jenkins_home }}:/var/jenkins_home"
+
+  - name: Wait for Jenkins password file
+    wait_for:
+      path: "{{ jenkins_home }}/secrets/initialAdminPassword"
+      timeout: 120
+
+  - name: Get Jenkins password
+    command: cat {{ jenkins_home }}/secrets/initialAdminPassword
+    register: jenkins_pass
+
+  - name: Show Jenkins info
+    debug:
+      msg:
+        - "Jenkins URL: http://{{ ansible_host }}:{{ jenkins_port }}"
+        - "Password: {{ jenkins_pass.stdout }}"

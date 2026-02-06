@@ -1,0 +1,79 @@
+def remote = "origin"
+def directory = "/opt/dumbmerch/frontend"
+def server = "fauzan@103.103.23.208"
+def cred = "fauzanssh"
+
+def imageName = "dumbmerch-fe-${env.BRANCH_NAME}"
+def containerName = "frontend-${env.BRANCH_NAME}"
+
+pipeline {
+    agent any
+
+    triggers {
+        githubPush()
+    }
+
+    stages {
+
+        stage('Show Branch Info') {
+            steps {
+                echo "Deploying branch: ${env.BRANCH_NAME}"
+            }
+        }
+
+        stage('Repo Pull') {
+            steps {
+                sshagent([cred]) {
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${server} << EOF
+                        cd ${directory}
+                        git fetch ${remote}
+                        git checkout ${env.BRANCH_NAME}
+                        git pull ${remote} ${env.BRANCH_NAME}
+                    EOF
+                    """
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                sshagent([cred]) {
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${server} << EOF
+                        cd ${directory}
+                        docker build -t ${imageName} .
+                    EOF
+                    """
+                }
+            }
+        }
+
+        stage('Stop & Remove Old Container') {
+            steps {
+                sshagent([cred]) {
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${server} << EOF
+                        docker rm -f ${containerName} || true
+                    EOF
+                    """
+                }
+            }
+        }
+
+        stage('Docker Run') {
+            steps {
+                sshagent([cred]) {
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${server} << EOF
+                        docker run -d \
+                        -p ${env.BRANCH_NAME == 'production' ? '3000:3000' : '3001:3000'} \
+                        --name ${containerName} \
+                        ${imageName}
+                    EOF
+                    """
+                }
+            }
+        }
+    }
+}
