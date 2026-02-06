@@ -1,0 +1,110 @@
+def remote = "origin"
+def directory = "/opt/dumbmerch/frontend"
+def server = "devops@13.236.136.137"
+def cred = "devops"
+
+def imageName = "dumbmerch-fe-${env.BRANCH_NAME}"
+def containerName = "frontend-${env.BRANCH_NAME}"
+
+pipeline {
+    agent any
+
+    triggers {
+        githubPush()
+    }
+
+    stages {
+
+        stage('Show Branch Info') {
+            steps {
+                echo "Deploying branch: ${env.BRANCH_NAME}"
+            }
+        }
+
+        stage('Code Quality - SonarQube') {
+            steps {
+              script {
+                  def scannerHome = tool 'sonar-scanner'
+
+                  withSonarQubeEnv('sonarqube') {
+                      sh """
+                      ${scannerHome}/bin/sonar-scanner \
+                        -Dsonar.projectKey=dumbmerch-frontend \
+                        -Dsonar.sources=. \
+                        -Dsonar.language=js
+                      """
+                  }
+              }
+           }
+        }
+        
+        stage('Repo Pull') {
+            steps {
+                sshagent([cred]) {
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${server} '
+                        cd ${directory}
+                        git fetch ${remote}
+                        git checkout ${env.BRANCH_NAME}
+                        git pull ${remote} ${env.BRANCH_NAME}
+                    '
+                    """
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                sshagent([cred]) {
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${server} '
+                        cd ${directory}
+                        docker build -t ${imageName} .
+                    '
+                    """
+                }
+            }
+        }
+
+        stage('Stop & Remove Old Container') {
+            steps {
+                sshagent([cred]) {
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${server} '
+                        docker stop -f ${containerName} || true
+                        docker rm -f ${containerName} || true
+                    '
+                    """
+                }
+            }
+        }
+
+        stage('Docker Run') {
+            steps {
+                sshagent([cred]) {
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${server} '
+                        docker run -d \
+                        -p ${env.BRANCH_NAME == 'production' ? '3000:80' : '3001:80'} \
+                        --name ${containerName} \
+                        ${imageName}
+                    '
+                    """
+                }
+            }
+        }
+
+        stage('App Health Check') {
+            steps {
+                sshagent([cred]) {
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${server} '
+                        sleep 5
+                        wget --spider http://localhost:${env.BRANCH_NAME == 'production' ? '3000' : '3001'}
+                    '
+                    """
+                }
+            }
+        }
+    }
+}

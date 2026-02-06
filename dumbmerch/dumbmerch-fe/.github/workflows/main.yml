@@ -1,0 +1,58 @@
+name: Build & Deploy Frontend
+
+on:
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: registry.fauzan.studentdumbways.my.id/dumbmerch/frontend:production
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Registry
+        run: |
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login \
+            ${{ secrets.REGISTRY_HOST }} \
+            -u ${{ secrets.REGISTRY_USERNAME }} \
+            --password-stdin
+
+      - name: Build Docker Image
+        run: |
+          docker build -t $IMAGE_NAME .
+
+      - name: Push Docker Image
+        run: |
+          docker push $IMAGE_NAME
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login \
+              ${{ secrets.REGISTRY_HOST }} \
+              -u ${{ secrets.REGISTRY_USERNAME }} \
+              --password-stdin
+
+            docker pull $IMAGE_NAME
+
+            docker stop frontend-staging || true
+            docker rm frontend-staging || true
+
+            docker run -d \
+              --name frontend-staging \
+              -p 3002:80 \
+              --restart always \
+              $IMAGE_NAME

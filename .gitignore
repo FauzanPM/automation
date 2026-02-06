@@ -6,4 +6,3 @@ aws/*.tfstate.backup
 # Optional
 *.log
 
-dumbmerch/

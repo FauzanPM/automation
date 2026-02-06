@@ -1,0 +1,116 @@
+def remote = "origin"
+def directory = "/opt/dumbmerch/backend"
+def server = "devops@13.236.136.137"
+def cred = "devops"
+def imageName = "dumbmerch-be-${env.BRANCH_NAME}"
+def containerName = "backend-${env.BRANCH_NAME}"
+
+pipeline {
+    agent any
+    
+    triggers {
+        githubPush()
+    }
+    
+    stages {
+        stage('Show Branch Info') {
+            steps {
+                echo "Deploying branch: ${env.BRANCH_NAME}"
+            }
+        }
+        
+        stage('Code Quality - SonarQube') {
+            steps {
+                script {
+                    def scannerHome = tool 'sonar-scanner'
+                    withSonarQubeEnv('sonarqube') {
+                        sh """
+                        ${scannerHome}/bin/sonar-scanner \
+                          -Dsonar.projectKey=dumbmerch-backend \
+                          -Dsonar.sources=. \
+                          -Dsonar.language=go \
+                          -Dsonar.exclusions=**/*_test.go,**/vendor/**
+                        """
+                    }
+                }
+            }
+        }
+        
+        stage('Repo Pull') {
+            steps {
+                sshagent([cred]) {
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${server} '
+                        cd ${directory}
+                        git fetch ${remote}
+                        git checkout ${env.BRANCH_NAME}
+                        git pull ${remote} ${env.BRANCH_NAME}
+                    '
+                    """
+                }
+            }
+        }
+        
+        stage('Docker Build') {
+            steps {
+                sshagent([cred]) {
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${server} '
+                        cd ${directory}
+                        docker build -t ${imageName} .
+                    '
+                    """
+                }
+            }
+        }
+        
+        stage('Stop & Remove Old Container') {
+            steps {
+                sshagent([cred]) {
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${server} '
+                        docker stop ${containerName} || true
+                        docker rm ${containerName} || true
+                    '
+                    """
+                }
+            }
+        }
+        
+        stage('Docker Run') {
+            steps {
+                sshagent([cred]) {
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${server} '
+                        docker run -d \
+                        -p ${env.BRANCH_NAME == 'production' ? '5000:8080' : '5001:8080'} \
+                        --name ${containerName} \
+                        -v ${directory}/uploads:/app/uploads \
+                        --network dumbmerch-network \
+                        ${imageName}
+                    '
+                    """
+                }
+            }
+        }
+        
+        stage('App Health Check') {
+            steps {
+                sshagent([cred]) {
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${server} '
+                        sleep 5
+                        wget --spider --timeout=10 http://localhost:${env.BRANCH_NAME == 'production' ? '5000' : '5001'} 2>&1 | grep -E "connected|200|404"
+                        if [ \$? -eq 0 ]; then
+                            echo "✓ Backend is responding"
+                        else
+                            echo "✗ Backend is not responding"
+                            exit 1
+                        fi
+                    '
+                    """
+                }
+            }
+        }
+    }
+}
