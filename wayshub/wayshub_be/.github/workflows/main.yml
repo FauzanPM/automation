@@ -1,0 +1,80 @@
+name: Wayshub Backend CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: registry.fauzan.studentdumbways.my.id
+  IMAGE_NAME: wayshub-be
+  IMAGE_TAG: latest
+  APP_PORT: 5000
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Login registry
+        run: |
+          echo "${{ secrets.REGISTRY_PASS }}" | docker login $REGISTRY \
+            -u "${{ secrets.REGISTRY_USER }}" --password-stdin
+
+      - name: Build image
+        run: docker build -t $REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
+
+      - name: Push image
+        run: docker push $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+
+      - name: Deploy
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ubuntu
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          envs: REGISTRY,IMAGE_NAME,IMAGE_TAG,APP_PORT
+          script: |
+            echo "${{ secrets.REGISTRY_PASS }}" | docker login $REGISTRY \
+              -u "${{ secrets.REGISTRY_USER }}" --password-stdin
+
+            # MYSQL
+            if [ ! -f docker-compose.mysql.yml ]; then
+              printf "%s\n" \
+              "services:" \
+              "  mysql:" \
+              "    image: mysql:5.7" \
+              "    container_name: mysql-wayshub" \
+              "    restart: always" \
+              "    environment:" \
+              "      MYSQL_ROOT_PASSWORD: rootpassword" \
+              "      MYSQL_DATABASE: wayshub" \
+              "      MYSQL_USER: fauzan" \
+              "      MYSQL_PASSWORD: devops123" \
+              "    ports:" \
+              "      - \"3306:3306\"" \
+              "    volumes:" \
+              "      - mysql-data:/var/lib/mysql" \
+              "    command: --default-authentication-plugin=mysql_native_password" \
+              "volumes:" \
+              "  mysql-data:" > docker-compose.mysql.yml
+            fi
+
+            docker compose -f docker-compose.mysql.yml up -d
+
+            # ===== BACKEND =====
+            docker pull $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+
+            docker stop wayshub-be || true
+            docker rm wayshub-be || true
+
+            docker run -d \
+              --name wayshub-be \
+              -p $APP_PORT:$APP_PORT \
+              $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+
+            sleep 20
+            docker exec wayshub-be npx sequelize db:migrate

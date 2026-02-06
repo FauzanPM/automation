@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: wayshub-frontend
+  namespace: wayshub
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - kube.fauzan.studentdumbways.my.id
+      secretName: wayshub-frontend-tls
+  rules:
+    - host: kube.fauzan.studentdumbways.my.id
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: wayshub-frontend
+                port:
+                  number: 80

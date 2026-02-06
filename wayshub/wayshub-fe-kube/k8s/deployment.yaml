@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wayshub-frontend
+  namespace: wayshub
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: wayshub-frontend
+  template:
+    metadata:
+      labels:
+        app: wayshub-frontend
+    spec:
+      containers:
+        - name: wayshub-frontend
+          image: registry.fauzan.studentdumbways.my.id/wayshub-frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
